@@ -7,9 +7,20 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDebug>
+#include <QCoreApplication>
 
 ProjectManager::ProjectManager(QObject *parent) : QObject(parent) {
-    manifestPath = "project.manifest.json"; // default for POC
+    // Default manifest location: project root (one level up from the executable directory).
+    // This assumes a typical out-of-source build where the build folder is inside the project.
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QDir projectDir = appDir;
+    if (projectDir.cdUp()) {
+        manifestPath = projectDir.filePath("project.manifest.json");
+    } else {
+        // Fallback to exe directory if we cannot go up
+        manifestPath = appDir.filePath("project.manifest.json");
+    }
+    qDebug() << "ProjectManager manifestPath set to" << manifestPath;
 }
 
 QVariantList ProjectManager::scanFonts() {
