@@ -1,8 +1,7 @@
 <RCC>
   <qresource prefix="/">
-    <!-- Place your test fonts into a fonts/ folder and add to the qrc, or edit this to not use qrc -->
-    <file>fonts/NotoNastaliqUrdu-Regular.ttf</file>
     <file>qml/Main.qml</file>
     <file>qml/PoetryEditor.qml</file>
+    <file>qml/Theme.qml</file>
   </qresource>
 </RCC>
