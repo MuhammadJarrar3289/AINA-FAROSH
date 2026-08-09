@@ -7,6 +7,7 @@ Item {
     property string sampleFilePath: ""
     property string fontFamily: "Noto Nastaliq Urdu"
     property int fontSize: 20
+    property alias content: textItem.text
 
     signal contentChanged(string content)
 
@@ -37,7 +38,9 @@ Item {
                 // Preserve line breaks — we rely on user to include them
                 // Do not auto-justify here for POC
                 placeholderText: "Paste or type your Urdu poetry here. Line breaks are preserved."
-                onTextChanged: root.contentChanged(text)
+                onTextChanged: {
+                    root.contentChanged(text)
+                }
             }
 
             Component.onCompleted: {

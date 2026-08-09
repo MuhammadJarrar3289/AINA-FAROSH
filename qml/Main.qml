@@ -142,6 +142,7 @@ Window {
                         // Title
                         Text {
                             id: titleText
+                            objectName: "titleText"
                             text: "آئینہ فروش"
                             font.family: "Noto Nastaliq Urdu"
                             font.pixelSize: 34
@@ -152,6 +153,7 @@ Window {
                         // Poetry editor area
                         PoetryEditor {
                             id: editor
+                            objectName: "poetryEditor"
                             anchors.top: titleText.bottom
                             anchors.topMargin: 12
                             anchors.left: parent.left
@@ -171,20 +173,44 @@ Window {
             }
         }
 
-        // Right properties/inspector
+        // Right properties/inspector with Tabs (Properties / Fonts)
         Rectangle {
             width: 360
             color: theme.panel
             border.color: theme.panelBorder
+
             Column {
                 anchors.fill: parent; anchors.margins: 12; spacing: 8
-                Text { text: "Properties"; color: theme.textPrimary; font.pixelSize: 14 }
-                Row { spacing: 8; Text { text: "Font:"; color: theme.textSecondary } ComboBox { id: fontBox; model: ["Noto Nastaliq Urdu", "System Nastaliq", "Scheherazade"]; onCurrentTextChanged: { editor.fontFamily = currentText } } }
-                Row { spacing: 8; Text { text: "Size:"; color: theme.textSecondary } Slider { id: sizeSlider; from: 14; to: 36; value: 20; onValueChanged: editor.fontSize = value } }
-                Rectangle { height: 1; color: theme.panelBorder }
-                Text { text: "Preview"; color: theme.textSecondary }
-                Rectangle { color: theme.previewBg; radius: 6; height: 120; anchors.left: parent.left; anchors.right: parent.right
-                    Text { text: "یہ شاعری کا پری ویو ہے۔"; color: theme.textPrimary; anchors.centerIn: parent; font.pixelSize: 18 }
+
+                Row { spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
+                    Button { id: propsTab; text: "Properties"; checked: true; checkable: true; onClicked: { inspectorStack.currentIndex = 0; propsTab.checked=true; fontsTab.checked=false } }
+                    Button { id: fontsTab; text: "Fonts"; checkable: true; onClicked: { inspectorStack.currentIndex = 1; fontsTab.checked=true; propsTab.checked=false } }
+                }
+
+                StackView { id: inspectorStack; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom; initialItem: propertiesView }
+
+                Component { id: propertiesView
+                    Rectangle { color: "transparent"; Column { anchors.fill: parent; spacing: 8; Text { text: "Properties"; color: theme.textPrimary; font.pixelSize: 14 }
+                            Row { spacing: 8; Text { text: "Font:"; color: theme.textSecondary } ComboBox { id: fontBox; model: ["Noto Nastaliq Urdu", "System Nastaliq", "Scheherazade"]; onCurrentTextChanged: { editor.fontFamily = currentText } } }
+                            Row { spacing: 8; Text { text: "Size:"; color: theme.textSecondary } Slider { id: sizeSlider; from: 14; to: 36; value: 20; onValueChanged: editor.fontSize = value } }
+                            Rectangle { height: 1; color: theme.panelBorder }
+                            Text { text: "Preview"; color: theme.textSecondary }
+                            Rectangle { color: theme.previewBg; radius: 6; height: 120; anchors.left: parent.left; anchors.right: parent.right
+                                Text { text: "یہ شاعری کا پری ویو ہے۔"; color: theme.textPrimary; anchors.centerIn: parent; font.pixelSize: 18 }
+                            }
+                        }
+                    }
+                }
+
+                Component { id: fontsView
+                    Rectangle { color: "transparent"; FontManager { anchors.fill: parent } }
+                }
+
+                // Loader to show the selected view
+                Loader {
+                    id: viewLoader
+                    active: true
+                    sourceComponent: inspectorStack.initialItem
                 }
             }
         }
