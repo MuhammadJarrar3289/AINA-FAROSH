@@ -1,0 +1,19 @@
+# Build artefacts
+/build/
+
+# Qt Creator
+*.user
+
+# Visual Studio
+.vs/
+*.vcxproj.user
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# OS files
+.DS_Store
+Thumbs.db
