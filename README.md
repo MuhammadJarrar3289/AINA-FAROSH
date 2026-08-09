@@ -5,6 +5,7 @@ This is a minimal POC for the Urdu Poetry Studio app (Qt 6 + QML). It demonstrat
 - Right-to-left poetry editing with line-break preservation
 - Modern animated QML UI
 - Export of the current page to `exported_poem.pdf`
+- Theme switcher (Dark / Light) — toggle using the moon/sun button in the header
 
 Important: this POC expects you to supply a Nastaliq-capable font file. For licensing reasons no proprietary fonts are bundled.
 
