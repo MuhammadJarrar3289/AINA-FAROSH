@@ -1,4 +1,5 @@
 #include "Backend.h"
+#include "ProjectManager.h"
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QPdfWriter>
@@ -11,6 +12,9 @@
 #include <QTextDocument>
 #include <QTextOption>
 #include <QFontDatabase>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QJsonArray>
 
 Backend::Backend(QObject *parent) : QObject(parent) {}
 
@@ -52,6 +56,10 @@ bool Backend::exportCurrentViewToPdf(const QString &qmlObjectName, const QString
         qWarning() << "PoetryEditor (poetryEditor) not found. Falling back to raster export.";
     }
 
+    // Prepare export report
+    QJsonObject report;
+    QJsonArray fontsReportArr;
+
     // If we have textual content, produce a vector PDF using QTextDocument
     if (!content.isEmpty()) {
         // Determine canvas logical size
@@ -64,6 +72,39 @@ bool Backend::exportCurrentViewToPdf(const QString &qmlObjectName, const QString
 
         const int baseDpi = 96;
         double scale = double(dpi) / baseDpi;
+
+        // Determine embedding decision for the font used
+        bool embedAllowed = true; // default
+        QString fontPathUsed;
+        if (m_projectManager) {
+            QVariantList fonts = m_projectManager->getFonts();
+            for (const QVariant &v : fonts) {
+                QVariantMap m = v.toMap();
+                QString name = m.value("name").toString();
+                QString path = m.value("path").toString();
+                bool auto_detect = m.value("auto_detected_embed").toBool();
+                QVariant ov = m.value("embed_override");
+                bool overridePresent = ov.isValid() && !ov.isNull();
+                bool overrideVal = overridePresent ? ov.toBool() : false;
+                if (name == fontFamily || QFileInfo(path).baseName() == fontFamily) {
+                    fontPathUsed = path;
+                    if (overridePresent) embedAllowed = overrideVal;
+                    else embedAllowed = auto_detect;
+
+                    QJsonObject fr;
+                    fr["name"] = name;
+                    fr["path"] = path;
+                    fr["auto_detected_embed"] = auto_detect;
+                    if (overridePresent) fr["embed_override"] = overrideVal;
+                    else fr["embed_override"] = QJsonValue();
+                    fr["decided_embed"] = embedAllowed;
+                    fontsReportArr.append(fr);
+                    break;
+                }
+            }
+        } else {
+            qWarning() << "No ProjectManager available; defaulting to embedAllowed=true";
+        }
 
         // Create PDF writer with page size matching canvas at requested DPI
         QPdfWriter writer(outputPath);
@@ -88,7 +129,6 @@ bool Backend::exportCurrentViewToPdf(const QString &qmlObjectName, const QString
         // Draw title
         qreal x = 0;
         qreal y = 0;
-        qreal margin = 0; // poetryCanvas already accounts for margins
 
         if (!titleText.isEmpty()) {
             QFont titleFont(fontFamily);
@@ -96,9 +136,6 @@ bool Backend::exportCurrentViewToPdf(const QString &qmlObjectName, const QString
             painter.setFont(titleFont);
             painter.setPen(Qt::black);
             QRectF titleRect(x, y, w, 60);
-            // Right-aligned title
-            QTextOption titleOpt;
-            titleOpt.setAlignment(Qt::AlignHCenter);
             painter.drawText(titleRect, Qt::AlignHCenter | Qt::AlignVCenter, titleText);
             y += 60 + 8; // move below title
         }
@@ -108,17 +145,64 @@ bool Backend::exportCurrentViewToPdf(const QString &qmlObjectName, const QString
         QFont bodyFont(fontFamily);
         bodyFont.setPixelSize(fontSize);
         doc.setDefaultFont(bodyFont);
-        doc.setDefaultTextOption(QTextOption(Qt::AlignRight));
+        QTextOption opt;
+        opt.setTextDirection(Qt::RightToLeft);
+        opt.setAlignment(Qt::AlignRight);
+        doc.setDefaultTextOption(opt);
         // Preserve line breaks: setPlainText will keep them
         doc.setPlainText(content);
 
         // Set document width to canvas width so lines wrap only if they exceed width
         doc.setTextWidth(w);
 
-        // Render the document at position (x,y)
-        painter.translate(x, y);
-        doc.drawContents(&painter);
+        if (embedAllowed) {
+            // Draw document vectorially — fonts that allow embedding will be embedded as subsets by Qt
+            painter.save();
+            painter.translate(x, y);
+            doc.drawContents(&painter);
+            painter.restore();
+            report["message"] = "Exported with embedded fonts where allowed.";
+        } else {
+            // Rasterize only the poem text (high-res) and draw image into PDF
+            qDebug() << "Embedding not allowed for font" << fontFamily << "— rasterizing poem text runs.";
+            // Render doc to high-res image
+            QSize imgSize(int(w * scale), int(doc.size().height() * scale));
+            if (imgSize.width() <=0 || imgSize.height() <=0) {
+                qWarning() << "Invalid image size for rasterization" << imgSize;
+            } else {
+                QImage img(imgSize, QImage::Format_ARGB32);
+                img.fill(Qt::transparent);
+                QPainter imgPainter(&img);
+                imgPainter.setRenderHint(QPainter::Antialiasing);
+                imgPainter.scale(scale, scale);
+                painter.setPen(Qt::NoPen);
+                imgPainter.translate(0, 0);
+                doc.drawContents(&imgPainter);
+                imgPainter.end();
+
+                // Draw the raster image into the PDF at position (x,y) — painter currently scaled, so draw with device-independent size
+                painter.drawImage(QPointF(x, y), img);
+                report["message"] = "Exported with rasterized text for fonts disallowing embedding.";
+
+                QJsonObject fr;
+                fr["fontFamily"] = fontFamily;
+                fr["embed_decision"] = false;
+                fr["note"] = "Rasterized poem text due to embedding restrictions.";
+                fontsReportArr.append(fr);
+            }
+        }
+
         painter.end();
+
+        report["fonts"] = fontsReportArr;
+        // Write report next to PDF
+        QString reportPath = QFileInfo(outputPath).absolutePath() + "/" + QFileInfo(outputPath).completeBaseName() + "_export_report.json";
+        QFile rep(reportPath);
+        if (rep.open(QIODevice::WriteOnly)) {
+            rep.write(QJsonDocument(report).toJson(QJsonDocument::Indented));
+            rep.close();
+            qDebug() << "Wrote export report to" << reportPath;
+        }
 
         qDebug() << "Vector PDF exported to" << outputPath;
         return true;

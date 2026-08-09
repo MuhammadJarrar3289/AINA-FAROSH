@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QDebug>
 #include "Backend.h"
+#include "ProjectManager.h"
 
 int main(int argc, char *argv[])
 {
@@ -39,7 +40,10 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
     Backend backend;
+    ProjectManager projectManager;
     engine.rootContext()->setContextProperty("Backend", &backend);
+    engine.rootContext()->setContextProperty("Project", &projectManager);
+    backend.setProjectManager(&projectManager);
     const QUrl url(QStringLiteral("qrc:/qml/Main.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
                      &app, [url](QObject *obj, const QUrl &objUrl) {
